@@ -1,74 +1,191 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>PC1 - 조이스틱 데이터 전송</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
+<meta charset="UTF-8" />
+<title>PC1 - 실제 조이스틱 데이터 전송 및 영상 수신</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
+<script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
 </head>
-<body class="bg-gray-100 p-4">
-  <h1 class="text-2xl font-bold mb-4">PC1 - 조이스틱 데이터 전송</h1>
-  <div id="status" class="text-lg font-semibold text-yellow-600">연결 대기중...</div>
-  <div id="outgoingData" class="text-gray-700 mt-4">전송 데이터 없음</div>
 
-  <script>
-    const signalingServer = 'ws://192.168.0.100:3002'; // 시그널링 서버 주소로 수정
-    const socket = io(signalingServer, { transports: ['websocket'] });
-    let peer = null;
+<body class="bg-gray-100">
+<header class="flex items-center justify-between p-4 bg-blue-800 text-white">
+  <div class="flex items-center gap-4">
+    <img src="https://blog.kakaocdn.net/dn/71hSN/btsJTBBLxY4/JjQxPDPxp1BZhDPm9u0bEK/img.gif" alt="로고 이미지" class="h-14 w-auto rounded-full">
+    <h1 class="text-xl font-bold whitespace-nowrap">PC1 - 실제 조이스틱 데이터 전송 및 영상 수신</h1>
+  </div>
+  <div class="flex gap-2">
+    <button id="reconnectButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">재연결</button>
+    <button id="disconnectButton" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">연결 종료</button>
+  </div>
+</header>
 
-    function updateStatus(text, color) {
-      const statusElem = document.getElementById('status');
-      statusElem.innerText = text;
-      statusElem.className = `text-lg font-semibold ${color}`;
+<main class="flex flex-col gap-4 p-4">
+  <section class="flex flex-col gap-2 rounded bg-white p-4 shadow">
+    <div id="status" class="text-lg font-semibold text-yellow-600">연결 대기중...</div>
+    <div id="outgoingData" class="text-gray-700 text-center">전송 데이터 없음</div>
+  </section>
+
+  <section class="flex flex-col gap-4">
+    <video id="remoteVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
+
+    <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
+      <label for="videoWidth" class="text-sm">Width:</label>
+      <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
+      <label for="videoHeight" class="text-sm">Height:</label>
+      <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
+      <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
+    </div>
+  </section>
+
+  <!-- 대화창 및 파일 전송 -->
+  <section class="flex flex-col gap-2 bg-white p-4 shadow rounded">
+    <h2 class="text-lg font-semibold">대화창 / 파일 전송</h2>
+    <div id="chatBox" class="h-40 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
+    <input type="file" id="fileInput" class="mb-2">
+    <div class="flex gap-2">
+      <input type="text" id="messageInput" class="flex-1 border p-1 rounded" placeholder="메시지 입력...">
+      <button id="sendButton" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">전송</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const signalingServer = 'https://my-signaling-server-uo91.onrender.com';
+const socket = io(signalingServer, { transports: ['websocket'] });
+let peer = null;
+let isReconnecting = false;
+
+function updateStatus(text, colorClass) {
+  const statusElem = document.getElementById('status');
+  statusElem.innerText = text;
+  statusElem.classList.remove('text-yellow-600', 'text-green-600', 'text-red-600');
+  statusElem.classList.add(colorClass);
+}
+
+function initializePeer() {
+  if (peer && !peer.destroyed) peer.destroy();
+
+  peer = new SimplePeer({
+    initiator: true,
+    trickle: false,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'turn:your.external.ip:3478', username: 'user', credential: 'pass' }
+      ]
     }
+  });
 
-    function initializePeer() {
-      if (peer && !peer.destroyed) peer.destroy();
-
-      peer = new SimplePeer({
-        initiator: true,
-        trickle: false
-      });
-
-      peer.on('signal', data => {
-        socket.emit('signal', data);
-      });
-
-      peer.on('connect', () => {
-        updateStatus('PC2와 연결됨', 'text-green-600');
-      });
-
-      peer.on('close', () => {
-        updateStatus('연결 끊어짐', 'text-red-600');
-      });
+  peer.on('signal', data => socket.emit('signal', data));
+  peer.on('connect', () => {
+    isReconnecting = false;
+    updateStatus('PC2와 연결됨', 'text-green-600');
+  });
+  peer.on('close', () => {
+    if (isReconnecting) {
+      console.log("PC1: 재접속 중...");
+      return;
     }
+    updateStatus('연결 끊어짐', 'text-red-600');
+  });
+  peer.on('track', (track, stream) => {
+    document.getElementById('remoteVideo').srcObject = stream;
+  });
+}
 
-    socket.on('signal', data => {
-      if (peer) peer.signal(data);
-    });
+socket.on('signal', data => {
+  if (peer) peer.signal(data);
+});
 
-    initializePeer();
-
-    // 게임패드 데이터 전송
-    function updateGamepad() {
-      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-      if (gamepads[0]) {
-        const gp = gamepads[0];
-        const data = {
-          axes: gp.axes.map(v => +v.toFixed(2)),
-          buttons: gp.buttons.map(b => b.pressed ? 1 : 0)
-        };
-        document.getElementById('outgoingData').innerHTML = `
-          <p>X: ${data.axes[0]}, Y: ${data.axes[1]}, Z: ${data.axes[3] || 0}</p>
-          <p>A: ${data.buttons[0]}, B: ${data.buttons[1]}</p>`;
-        if (peer && peer.connected) {
-          peer.send(JSON.stringify(data));
-        }
-      }
-      requestAnimationFrame(updateGamepad);
+function updateGamepad() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  if (gamepads[0]) {
+    const gp = gamepads[0];
+    const data = {
+      axes: gp.axes.map(v => +v.toFixed(2)),
+      buttons: gp.buttons.map(b => b.pressed ? 1 : 0)
+    };
+    document.getElementById('outgoingData').innerHTML = `
+      <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
+        |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${data.axes[0]}</span></div>|
+        <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-data.axes[1]}</span></div>|
+        <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-data.axes[3] || 0}</span></div>|
+        <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 text-center">${data.buttons[0]}</span></div>|
+        <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 text-center">${data.buttons[1]}</span></div>|
+      </div>`;
+    if (peer && peer.connected) {
+      peer.send(JSON.stringify(data));
     }
-    window.addEventListener("gamepadconnected", () => updateGamepad());
-  </script>
+  }
+  requestAnimationFrame(updateGamepad);
+}
+window.addEventListener("gamepadconnected", () => updateGamepad());
+
+function appendMessage(sender, message) {
+  const chatBox = document.getElementById("chatBox");
+  const div = document.createElement("div");
+  div.innerHTML = `<strong>${sender}:</strong> ${message}`;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
+      peer.send(JSON.stringify({
+        type: "file",
+        filename: file.name,
+        data: base64Data
+      }));
+      appendMessage("나", `파일 전송: ${file.name}`);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+document.getElementById("sendButton").addEventListener("click", () => {
+  const msg = document.getElementById("messageInput").value.trim();
+  if (msg && peer && peer.connected) {
+    peer.send(JSON.stringify({ type: "text", data: msg }));
+    appendMessage("나", msg);
+    document.getElementById("messageInput").value = "";
+  }
+});
+
+// ⭐️ 엔터 입력으로 메시지 전송
+document.getElementById("messageInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    document.getElementById("sendButton").click();
+  }
+});
+
+document.getElementById('disconnectButton').addEventListener('click', () => {
+  socket.emit('disconnectSignal', { from: 'PC1' });
+  if (peer && !peer.destroyed) peer.destroy();
+  updateStatus('연결 끊어짐', 'text-red-600');
+});
+
+document.getElementById('reconnectButton').addEventListener('click', () => {
+  isReconnecting = true;
+  updateStatus('연결 대기중...', 'text-yellow-600');
+  initializePeer();
+  socket.emit('reconnectRequest', { from: 'PC1' });
+});
+
+document.getElementById('updateSize').addEventListener('click', () => {
+  const w = document.getElementById('videoWidth').value;
+  const h = document.getElementById('videoHeight').value;
+  const v = document.getElementById('remoteVideo');
+  v.style.width = w + 'px';
+  v.style.height = h + 'px';
+});
+
+initializePeer();
+</script>
 </body>
 </html>
