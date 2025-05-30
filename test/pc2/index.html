@@ -27,22 +27,25 @@
     <div id="joystickData" class="text-gray-700 text-center">수신 데이터 없음</div>
   </section>
 
-  <section class="flex flex-col gap-4">
-    <video id="localVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
-    <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
-      <label for="videoWidth" class="text-sm">Width:</label>
-      <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
-      <label for="videoHeight" class="text-sm">Height:</label>
-      <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
-      <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
-    </div>
-  </section>
+  <div class="flex gap-4">
+    <!-- 화면 공유 -->
+    <section class="flex-1 flex flex-col gap-4">
+      <video id="localVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
+      <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
+        <label for="videoWidth" class="text-sm">Width:</label>
+        <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
+        <label for="videoHeight" class="text-sm">Height:</label>
+        <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
+        <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
+      </div>
+    </section>
 
-  <!-- 대화창 및 파일 전송 수신 -->
-  <section class="flex flex-col gap-2 bg-white p-4 shadow rounded">
-    <h2 class="text-lg font-semibold">대화창 / 파일 수신</h2>
-    <div id="chatBox" class="h-40 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
-  </section>
+    <!-- 대화창 / 파일 수신 (오른쪽) -->
+    <section class="w-1/4 flex flex-col gap-2 bg-white p-4 shadow rounded">
+      <h2 class="text-lg font-semibold">대화창 / 파일 수신</h2>
+      <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2"></div>
+    </section>
+  </div>
 </main>
 
 <script>
@@ -52,16 +55,15 @@ let peer = null;
 let localStream = null;
 const statusElem = document.getElementById('status');
 
-// ⭐️ ROS 2 rosbridge 연결
+// ROS 2 연결
 const ros = new ROSLIB.Ros({
   url: 'ws://localhost:9090'
 });
-
 ros.on('connection', () => console.log('ROS 2 연결됨'));
 ros.on('error', error => console.error('ROS 2 오류:', error));
 ros.on('close', () => console.log('ROS 2 연결 종료'));
 
-// ⭐️ ROS 2 퍼블리셔 (로봇팔 제어용)
+// ROS 2 퍼블리셔
 const joystickPub = new ROSLIB.Topic({
   ros: ros,
   name: '/joystick_data',
@@ -82,7 +84,6 @@ function cleanupStream() {
   document.getElementById('localVideo').srcObject = null;
 }
 
-// ⭐️ 메시지 추가
 function appendMessage(sender, message) {
   const chatBox = document.getElementById("chatBox");
   const div = document.createElement("div");
@@ -105,9 +106,7 @@ function initializePeer() {
     }
   });
 
-  peer.on('signal', data => {
-    socket.emit('signal', data);
-  });
+  peer.on('signal', data => socket.emit('signal', data));
 
   peer.on('connect', () => {
     updateStatus('PC1과 연결됨', 'text-green-600');
@@ -126,14 +125,12 @@ function initializePeer() {
     try {
       const parsed = JSON.parse(data);
 
-      // 🎮 조이스틱 데이터
       if (parsed.axes && parsed.buttons) {
         const x = parsed.axes[0];
         const y = parsed.axes[1];
         const z = parsed.axes[3] || 0;
         const A = parsed.buttons[0] || 0;
         const B = parsed.buttons[1] || 0;
-
         document.getElementById('joystickData').innerHTML = `
           <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
             |<div class="flex items-center gap-1">X축: <span class="text-black w-10 inline-block text-center">${x}</span></div>|
@@ -142,11 +139,7 @@ function initializePeer() {
             <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 inline-block text-center">${A}</span></div>|
             <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 inline-block text-center">${B}</span></div>|
           </div>`;
-
-        const joyMsg = new ROSLIB.Message({
-          axes: parsed.axes,
-          buttons: parsed.buttons
-        });
+        const joyMsg = new ROSLIB.Message({ axes: parsed.axes, buttons: parsed.buttons });
         joystickPub.publish(joyMsg);
 
       } else if (parsed.type === "text") {
@@ -218,17 +211,12 @@ function startScreenShare() {
     localStream = stream;
     document.getElementById('localVideo').srcObject = stream;
     stream.getTracks().forEach(track => {
-      try {
-        peer.addTrack(track, stream);
-      } catch (err) {
-        console.error("트랙 추가 오류:", err);
-      }
+      try { peer.addTrack(track, stream); } catch (err) { console.error("트랙 추가 오류:", err); }
     });
   })
   .catch(err => console.error("화면 공유 오류:", err));
 }
 
-// 초기화
 initializePeer();
 </script>
 </body>
