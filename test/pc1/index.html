@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>PC1 - 조이스틱 데이터 전송</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+  <h1 class="text-2xl font-bold mb-4">PC1 - 조이스틱 데이터 전송</h1>
+  <div id="status" class="text-lg font-semibold text-yellow-600">연결 대기중...</div>
+  <div id="outgoingData" class="text-gray-700 mt-4">전송 데이터 없음</div>
+
+  <script>
+    const signalingServer = 'ws://192.168.0.100:3002'; // 시그널링 서버 주소로 수정
+    const socket = io(signalingServer, { transports: ['websocket'] });
+    let peer = null;
+
+    function updateStatus(text, color) {
+      const statusElem = document.getElementById('status');
+      statusElem.innerText = text;
+      statusElem.className = `text-lg font-semibold ${color}`;
+    }
+
+    function initializePeer() {
+      if (peer && !peer.destroyed) peer.destroy();
+
+      peer = new SimplePeer({
+        initiator: true,
+        trickle: false
+      });
+
+      peer.on('signal', data => {
+        socket.emit('signal', data);
+      });
+
+      peer.on('connect', () => {
+        updateStatus('PC2와 연결됨', 'text-green-600');
+      });
+
+      peer.on('close', () => {
+        updateStatus('연결 끊어짐', 'text-red-600');
+      });
+    }
+
+    socket.on('signal', data => {
+      if (peer) peer.signal(data);
+    });
+
+    initializePeer();
+
+    // 게임패드 데이터 전송
+    function updateGamepad() {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      if (gamepads[0]) {
+        const gp = gamepads[0];
+        const data = {
+          axes: gp.axes.map(v => +v.toFixed(2)),
+          buttons: gp.buttons.map(b => b.pressed ? 1 : 0)
+        };
+        document.getElementById('outgoingData').innerHTML = `
+          <p>X: ${data.axes[0]}, Y: ${data.axes[1]}, Z: ${data.axes[3] || 0}</p>
+          <p>A: ${data.buttons[0]}, B: ${data.buttons[1]}</p>`;
+        if (peer && peer.connected) {
+          peer.send(JSON.stringify(data));
+        }
+      }
+      requestAnimationFrame(updateGamepad);
+    }
+    window.addEventListener("gamepadconnected", () => updateGamepad());
+  </script>
+</body>
+</html>
