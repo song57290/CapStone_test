@@ -114,8 +114,8 @@ function updateGamepad() {
         |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${data.axes[0]}</span></div>|
         <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-data.axes[1]}</span></div>|
         <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-data.axes[3] || 0}</span></div>|
-        <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 text-center">${data.buttons[0]}</span></div>|
-        <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 text-center">${data.buttons[1]}</span></div>|
+        <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 text-center">${data.buttons[4]}</span></div>|
+        <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 text-center">${data.buttons[5]}</span></div>|
       </div>`;
     if (peer && peer.connected) {
       peer.send(JSON.stringify(data));
