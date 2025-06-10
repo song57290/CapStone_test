@@ -125,19 +125,22 @@ function initializePeer() {
     try {
       const parsed = JSON.parse(data);
 
+      // ⭐ 반복 데이터 수신 확인용 로그
+      console.log("📥 수신:", parsed);
+
       if (parsed.axes && parsed.buttons) {
         const x = parsed.axes[0];
         const y = parsed.axes[1];
         const z = parsed.axes[3] || 0;
-        const A = parsed.buttons[4] || 0;
-        const B = parsed.buttons[5] || 0;
+        const LB = parsed.buttons[4] || 0;
+        const RB = parsed.buttons[5] || 0;
         document.getElementById('joystickData').innerHTML = `
           <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
             |<div class="flex items-center gap-1">X축: <span class="text-black w-10 inline-block text-center">${x}</span></div>|
             <div class="flex items-center gap-1">Y축: <span class="text-black w-10 inline-block text-center">${-y}</span></div>|
             <div class="flex items-center gap-1">Z축: <span class="text-black w-10 inline-block text-center">${-z}</span></div>|
-            <div class="flex items-center gap-1">LB: <span class="text-black w-10 inline-block text-center">${A}</span></div>|
-            <div class="flex items-center gap-1">RB: <span class="text-black w-10 inline-block text-center">${B}</span></div>|
+            <div class="flex items-center gap-1">LB: <span class="text-black w-10 inline-block text-center">${LB}</span></div>|
+            <div class="flex items-center gap-1">RB: <span class="text-black w-10 inline-block text-center">${RB}</span></div>|
           </div>`;
         const joyMsg = new ROSLIB.Message({ axes: parsed.axes, buttons: parsed.buttons });
         joystickPub.publish(joyMsg);
