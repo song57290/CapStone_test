@@ -63,10 +63,16 @@ const socket = io(signalingServer, { transports: ['websocket'] });
 let peer = null;
 let isReconnecting = false;
 
-// ⭐️ 추가 변수
+// 조이스틱 연결 여부 확인 로그
+window.addEventListener("gamepadconnected", (e) => {
+  console.log("🎮 조이스틱 연결됨:", e.gamepad);
+  updateGamepad();
+});
+
+// 추가 변수
 let blockSendUntil = 0;
 
-// ⭐️ 로그 제어용 변수
+// 로그 제어용 변수
 let isLogging = false;
 let loggedData = [];
 let replayInterval = null;
@@ -178,11 +184,11 @@ document.getElementById('resetLogButton').addEventListener('click', () => {
 function updateGamepad() {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   if (gamepads[0]) {
-    const gp = gamepads[0];
-    const data = {
-      axes: gp.axes.map(v => +v.toFixed(2)),
-      buttons: gp.buttons.map(b => b.pressed ? 1 : 0)
-    };
+  const gp = gamepads[0];
+  const data = {
+    axes: gp.axes.map(v => +v.toFixed(2)),
+    buttons: gp.buttons.map(b => b.pressed ? 1 : 0)
+  };
 
     document.getElementById('outgoingData').innerHTML = `
       <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
@@ -195,16 +201,20 @@ function updateGamepad() {
 
     if (peer && peer.connected) {
       peer.send(JSON.stringify(data));
+      console.log("📤 전송한 data:", data);
     }
 
     if (isLogging && loggedData.length < 300) {
       loggedData.push(data);
     }
+    // console.log("🎮 현재 조이스틱 상태:", gp.axes, gp.buttons); // 실시간 값을 잘 받아오는지 보기 위함으로 나중에 지울 것
   }
   requestAnimationFrame(updateGamepad);
 }
-window.addEventListener("gamepadconnected", () => updateGamepad());
-
+window.addEventListener("gamepadconnected", (e) => {
+  console.log("🎮 조이스틱 연결됨:", e.gamepad);
+  updateGamepad();
+});
 document.getElementById('disconnectButton').addEventListener('click', () => {
   socket.emit('disconnectSignal', { from: 'PC1' });
   if (peer && !peer.destroyed) peer.destroy();
