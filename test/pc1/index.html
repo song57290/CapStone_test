@@ -26,9 +26,7 @@
     <div id="outgoingData" class="text-gray-700 text-center">전송 데이터 없음</div>
   </section>
 
-  <!-- 가로형으로 분리: 왼쪽 - 영상 / 오른쪽 - 대화창 -->
   <div class="flex gap-4">
-    <!-- 왼쪽: 영상 -->
     <section class="flex-1 flex flex-col gap-4">
       <video id="remoteVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
       <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
@@ -40,7 +38,6 @@
       </div>
     </section>
 
-    <!-- 오른쪽: 대화창 및 파일 전송 -->
     <section class="w-1/4 flex flex-col gap-2 bg-white p-4 shadow rounded">
       <h2 class="text-lg font-semibold">대화창 / 파일 전송</h2>
       <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
@@ -52,17 +49,11 @@
     </section>
   </div>
 
-  <!-- ⭐️ 로그 제어 확장 버튼 영역 -->
   <section class="flex gap-2 p-4 bg-white shadow rounded items-center">
     <button id="startLogButton" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">로그 시작</button>
     <button id="stopLogButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">로그 종료</button>
     <button id="resetLogButton" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">초기화</button>
     <button id="pauseLogButton" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">정지</button>
-    <label class="ml-4 font-semibold text-sm">반복 횟수:</label>
-    <input type="number" id="repeatCountInput" class="w-20 border rounded p-1 text-sm" min="1" value="3">
-
-    <!-- ⭐️ 반복 상태 표시 -->
-    <span id="repeatStatus" class="ml-4 text-sm text-blue-700 font-semibold"></span>
   </section>
 </main>
 
@@ -118,27 +109,11 @@ socket.on('signal', data => {
 let isLogging = false;
 let loggedData = [];
 let replayInterval = null;
-let currentRepeat = 0;
-let maxRepeat = 3; // 기본 반복 횟수
-const MAX_LOG_FRAME = 300; // ⭐ 최대 300 frame만 저장
-
-function updateRepeatStatus() {
-  const status = document.getElementById("repeatStatus");
-  if (currentRepeat === 0) {
-    status.textContent = "";
-  } else if (currentRepeat <= maxRepeat) {
-    status.textContent = `🔁 반복 ${currentRepeat} / ${maxRepeat}`;
-  } else {
-    status.textContent = "✅ 반복 완료";
-  }
-}
 
 document.getElementById('startLogButton').addEventListener('click', () => {
   isLogging = true;
   loggedData = [];
   clearInterval(replayInterval);
-  currentRepeat = 0;
-  updateRepeatStatus();
   document.getElementById('startLogButton').textContent = "로그 측정 중...";
   console.log('로그 시작');
 });
@@ -146,31 +121,18 @@ document.getElementById('startLogButton').addEventListener('click', () => {
 document.getElementById('stopLogButton').addEventListener('click', () => {
   isLogging = false;
   clearInterval(replayInterval);
-  maxRepeat = parseInt(document.getElementById('repeatCountInput').value) || 1;
-
-  // ⭐ 무조건 원복
   document.getElementById('startLogButton').textContent = "로그 시작";
 
   if (loggedData.length > 0 && peer && peer.connected) {
-    console.log(`로그 종료 → 반복 재생 ${maxRepeat}회 시작`);
+    console.log(`로그 종료 → 무한 반복 재생 시작`);
     let index = 0;
-    currentRepeat = 1;
-    updateRepeatStatus();
     replayInterval = setInterval(() => {
       if (!peer || !peer.connected) return;
       peer.send(JSON.stringify(loggedData[index]));
-      console.log("🔸 반복 전송 중:", loggedData[index]); // ⭐ PC1 측 확인용
+      console.log("🔸 반복 전송 중:", loggedData[index]);
       index++;
-
       if (index >= loggedData.length) {
         index = 0;
-        currentRepeat++;
-        updateRepeatStatus();
-        if (currentRepeat > maxRepeat) {
-          clearInterval(replayInterval);
-          updateRepeatStatus();
-          console.log('🎉 반복 완료');
-        }
       }
     }, 100);
   }
@@ -178,7 +140,6 @@ document.getElementById('stopLogButton').addEventListener('click', () => {
 
 document.getElementById('pauseLogButton').addEventListener('click', () => {
   clearInterval(replayInterval);
-  updateRepeatStatus();
   document.getElementById('startLogButton').textContent = "로그 시작";
   console.log('⏸ 반복 중단됨');
 });
@@ -186,9 +147,7 @@ document.getElementById('pauseLogButton').addEventListener('click', () => {
 document.getElementById('resetLogButton').addEventListener('click', () => {
   isLogging = false;
   loggedData = [];
-  currentRepeat = 0;
   clearInterval(replayInterval);
-  updateRepeatStatus();
   document.getElementById('startLogButton').textContent = "로그 시작";
   console.log('🧹 로그 초기화 완료');
 });
@@ -207,15 +166,15 @@ function updateGamepad() {
         |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${data.axes[0]}</span></div>|
         <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-data.axes[1]}</span></div>|
         <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-data.axes[3] || 0}</span></div>|
-        <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 text-center">${data.buttons[4]}</span></div>|
-        <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 text-center">${data.buttons[5]}</span></div>|
+        <div class="flex items-center gap-1">LB: <span class="text-black w-10 text-center">${data.buttons[4]}</span></div>|
+        <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${data.buttons[5]}</span></div>|
       </div>`;
 
     if (peer && peer.connected) {
       peer.send(JSON.stringify(data));
     }
 
-    if (isLogging && loggedData.length < MAX_LOG_FRAME) {
+    if (isLogging && loggedData.length < 300) {
       loggedData.push(data);
     }
   }
@@ -223,7 +182,52 @@ function updateGamepad() {
 }
 window.addEventListener("gamepadconnected", () => updateGamepad());
 
-/* (생략) appendMessage, fileInput, sendButton, reconnectButton, disconnectButton, updateSize 동일 — 이전과 동일하게 유지 */
+document.getElementById("sendButton").addEventListener("click", () => {
+  const msg = document.getElementById("messageInput").value.trim();
+  if (msg && peer && peer.connected) {
+    peer.send(JSON.stringify({ type: "text", data: msg }));
+    document.getElementById("chatBox").innerHTML += `<div><strong>나:</strong> ${msg}</div>`;
+    document.getElementById("messageInput").value = "";
+  }
+});
+
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
+      peer.send(JSON.stringify({
+        type: "file",
+        filename: file.name,
+        data: base64Data
+      }));
+      document.getElementById("chatBox").innerHTML += `<div><strong>나:</strong> 파일 전송: ${file.name}</div>`;
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+document.getElementById('disconnectButton').addEventListener('click', () => {
+  socket.emit('disconnectSignal', { from: 'PC1' });
+  if (peer && !peer.destroyed) peer.destroy();
+  updateStatus('연결 끊어짐', 'text-red-600');
+});
+
+document.getElementById('reconnectButton').addEventListener('click', () => {
+  isReconnecting = true;
+  updateStatus('연결 대기중...', 'text-yellow-600');
+  initializePeer();
+  socket.emit('reconnectRequest', { from: 'PC1' });
+});
+
+document.getElementById('updateSize').addEventListener('click', () => {
+  const w = document.getElementById('videoWidth').value;
+  const h = document.getElementById('videoHeight').value;
+  const v = document.getElementById('remoteVideo');
+  v.style.width = w + 'px';
+  v.style.height = h + 'px';
+});
 
 initializePeer();
 </script>

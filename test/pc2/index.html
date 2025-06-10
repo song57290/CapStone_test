@@ -28,7 +28,6 @@
   </section>
 
   <div class="flex gap-4">
-    <!-- 화면 공유 -->
     <section class="flex-1 flex flex-col gap-4">
       <video id="localVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
       <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
@@ -40,7 +39,6 @@
       </div>
     </section>
 
-    <!-- 대화창 / 파일 수신 (오른쪽) -->
     <section class="w-1/4 flex flex-col gap-2 bg-white p-4 shadow rounded">
       <h2 class="text-lg font-semibold">대화창 / 파일 수신</h2>
       <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2"></div>
@@ -55,15 +53,13 @@ let peer = null;
 let localStream = null;
 const statusElem = document.getElementById('status');
 
-// ROS 2 연결
 const ros = new ROSLIB.Ros({
-  url: 'ws://localhost:9090'
+  url: 'ws://192.168.35.245:9090' // ← 여기에 rosbridge 실행 중인 PC IP 넣기
 });
 ros.on('connection', () => console.log('ROS 2 연결됨'));
 ros.on('error', error => console.error('ROS 2 오류:', error));
 ros.on('close', () => console.log('ROS 2 연결 종료'));
 
-// ROS 2 퍼블리셔
 const joystickPub = new ROSLIB.Topic({
   ros: ros,
   name: '/joystick_data',
@@ -125,23 +121,24 @@ function initializePeer() {
     try {
       const parsed = JSON.parse(data);
 
-      // ⭐ 반복 데이터 수신 확인용 로그
+      // ⭐ Joy 데이터 수신 확인용 콘솔
       console.log("📥 수신:", parsed);
 
       if (parsed.axes && parsed.buttons) {
         const x = parsed.axes[0];
         const y = parsed.axes[1];
         const z = parsed.axes[3] || 0;
-        const LB = parsed.buttons[4] || 0;
-        const RB = parsed.buttons[5] || 0;
+        const A = parsed.buttons[4] || 0;
+        const B = parsed.buttons[5] || 0;
         document.getElementById('joystickData').innerHTML = `
           <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
             |<div class="flex items-center gap-1">X축: <span class="text-black w-10 inline-block text-center">${x}</span></div>|
             <div class="flex items-center gap-1">Y축: <span class="text-black w-10 inline-block text-center">${-y}</span></div>|
             <div class="flex items-center gap-1">Z축: <span class="text-black w-10 inline-block text-center">${-z}</span></div>|
-            <div class="flex items-center gap-1">LB: <span class="text-black w-10 inline-block text-center">${LB}</span></div>|
-            <div class="flex items-center gap-1">RB: <span class="text-black w-10 inline-block text-center">${RB}</span></div>|
+            <div class="flex items-center gap-1">LB: <span class="text-black w-10 inline-block text-center">${A}</span></div>|
+            <div class="flex items-center gap-1">RB: <span class="text-black w-10 inline-block text-center">${B}</span></div>|
           </div>`;
+
         const joyMsg = new ROSLIB.Message({ axes: parsed.axes, buttons: parsed.buttons });
         joystickPub.publish(joyMsg);
 
