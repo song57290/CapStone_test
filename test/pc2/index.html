@@ -54,7 +54,7 @@ let localStream = null;
 const statusElem = document.getElementById('status');
 
 const ros = new ROSLIB.Ros({
-  url: 'ws://192.168.35.245:9090' // ← 여기에 rosbridge 실행 중인 PC IP 넣기
+  url: 'ws://192.168.35.245:9090'
 });
 ros.on('connection', () => console.log('ROS 2 연결됨'));
 ros.on('error', error => console.error('ROS 2 오류:', error));
@@ -78,6 +78,10 @@ function cleanupStream() {
     localStream = null;
   }
   document.getElementById('localVideo').srcObject = null;
+}
+
+function clearJoystickData() {
+  document.getElementById('joystickData').innerText = '수신 데이터 없음';
 }
 
 function appendMessage(sender, message) {
@@ -112,6 +116,7 @@ function initializePeer() {
   peer.on('close', () => {
     updateStatus('연결 끊어짐', 'text-red-600');
     cleanupStream();
+    clearJoystickData();
     setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
   });
 
@@ -120,9 +125,6 @@ function initializePeer() {
   peer.on('data', data => {
     try {
       const parsed = JSON.parse(data);
-
-      // ⭐ Joy 데이터 수신 확인용 콘솔
-      console.log("📥 수신:", parsed);
 
       if (parsed.axes && parsed.buttons) {
         const x = parsed.axes[0];
@@ -175,12 +177,19 @@ socket.on('disconnectSignal', () => {
   if (peer && !peer.destroyed) peer.destroy();
   updateStatus('연결 끊어짐', 'text-red-600');
   cleanupStream();
+  clearJoystickData();
   setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
 });
 
 document.getElementById('disconnectButton').addEventListener('click', () => {
-  if (peer && !peer.destroyed) peer.destroy();
+  if (peer && !peer.destroyed) {
+    peer.removeAllListeners();
+    peer.destroy();
+  }
   socket.emit('disconnectSignal', { from: 'PC2' });
+  cleanupStream();
+  clearJoystickData();
+  updateStatus('연결 끊어짐', 'text-red-600');
 });
 
 document.getElementById('reconnectButton').addEventListener('click', () => {
@@ -188,6 +197,8 @@ document.getElementById('reconnectButton').addEventListener('click', () => {
     peer.removeAllListeners();
     peer.destroy();
   }
+  cleanupStream();
+  clearJoystickData();
   updateStatus('연결 대기중...', 'text-yellow-600');
   initializePeer();
   socket.emit('reconnectRequest', { from: 'PC2' });
