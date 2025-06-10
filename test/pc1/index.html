@@ -26,31 +26,28 @@
     <div id="outgoingData" class="text-gray-700 text-center">전송 데이터 없음</div>
   </section>
 
-  <!-- 가로형으로 분리: 왼쪽 - 영상 / 오른쪽 - 대화창 -->
-  <div class="flex gap-4">
-    <!-- 왼쪽: 영상 -->
-    <section class="flex-1 flex flex-col gap-4">
-      <video id="remoteVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
-      <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
-        <label for="videoWidth" class="text-sm">Width:</label>
-        <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
-        <label for="videoHeight" class="text-sm">Height:</label>
-        <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
-        <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
-      </div>
-    </section>
+  <section class="flex flex-col gap-4">
+    <video id="remoteVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
 
-    <!-- 오른쪽: 대화창 및 파일 전송 -->
-    <section class="w-1/4 flex flex-col gap-2 bg-white p-4 shadow rounded">
-      <h2 class="text-lg font-semibold">대화창 / 파일 전송</h2>
-      <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
-      <input type="file" id="fileInput" class="mb-2">
-      <div class="flex gap-2">
-        <input type="text" id="messageInput" class="flex-1 border p-1 rounded" placeholder="메시지 입력...">
-        <button id="sendButton" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">전송</button>
-      </div>
-    </section>
-  </div>
+    <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
+      <label for="videoWidth" class="text-sm">Width:</label>
+      <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
+      <label for="videoHeight" class="text-sm">Height:</label>
+      <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
+      <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
+    </div>
+  </section>
+
+  <!-- 대화창 및 파일 전송 -->
+  <section class="flex flex-col gap-2 bg-white p-4 shadow rounded">
+    <h2 class="text-lg font-semibold">대화창 / 파일 전송</h2>
+    <div id="chatBox" class="h-40 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
+    <input type="file" id="fileInput" class="mb-2">
+    <div class="flex gap-2">
+      <input type="text" id="messageInput" class="flex-1 border p-1 rounded" placeholder="메시지 입력...">
+      <button id="sendButton" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">전송</button>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -114,8 +111,8 @@ function updateGamepad() {
         |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${data.axes[0]}</span></div>|
         <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-data.axes[1]}</span></div>|
         <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-data.axes[3] || 0}</span></div>|
-        <div class="flex items-center gap-1">A버튼: <span class="text-black w-10 text-center">${data.buttons[4]}</span></div>|
-        <div class="flex items-center gap-1">B버튼: <span class="text-black w-10 text-center">${data.buttons[5]}</span></div>|
+        <div class="flex items-center gap-1">LB: <span class="text-black w-10 text-center">${data.buttons[0]}</span></div>|
+        <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${data.buttons[1]}</span></div>|
       </div>`;
     if (peer && peer.connected) {
       peer.send(JSON.stringify(data));
