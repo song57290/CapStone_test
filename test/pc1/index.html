@@ -201,8 +201,16 @@ function updateGamepad() {
 
     if (peer && peer.connected) {
       peer.send(JSON.stringify(data));
-      console.log("📤 전송한 data:", data);
+
+      // 원하는 형식으로 출력
+      const x = data.axes[0];
+      const y = data.axes[1];
+      const z = data.axes[3] || 0;
+      const A = data.buttons[4] || 0; // LB
+      const B = data.buttons[5] || 0; // RB
+      console.log(`📤 X: ${x}, Y: ${y}, Z: ${z}, LB: ${A}, RB: ${B}`);
     }
+
 
     if (isLogging && loggedData.length < 300) {
       loggedData.push(data);
