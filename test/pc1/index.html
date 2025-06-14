@@ -279,6 +279,7 @@
 
   initializePeer();
 
+  // ✅ 2. 이 안에서는 제거해줘
   document.getElementById('sendButton').addEventListener('click', () => {
     const input = document.getElementById('messageInput');
     const msg = input.value.trim();
@@ -291,9 +292,41 @@
       chatBox.scrollTop = chatBox.scrollHeight;
       input.value = '';
     } else {
-      alert("❌ 연결되지 않았습니다.");
+      alert("상대방과 연결되지 않았습니다.");
     }
   });
+
+
+  document.getElementById('messageInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+      document.getElementById('sendButton').click();
+    }
+  });
+
+  document.getElementById('fileInput').addEventListener('change', function (event) {
+  const file = event.target.files[0];
+  if (!file || !peer || !peer.connected) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const fileData = {
+      type: 'file',
+      name: file.name,
+      size: file.size,
+      content: Array.from(new Uint8Array(e.target.result))
+    };
+    peer.send(JSON.stringify(fileData));
+
+    const chatBox = document.getElementById('chatBox');
+    chatBox.innerHTML += `<div class="text-right text-purple-600">📁 파일 전송됨: ${file.name} (${file.size} bytes)</div>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = ''; // 같은 파일 다시 선택 가능하게 초기화
+});
+
+
   </script>
   </body>
 </html>
