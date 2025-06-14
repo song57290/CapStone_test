@@ -42,3 +42,6 @@ test13
 
 Complete
 - 최종본 완료
+
+test14
+- PC2측 파일 전송 문제 해결 완료
