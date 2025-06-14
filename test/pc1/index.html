@@ -304,26 +304,31 @@
     }
   });
 
-  document.getElementById('fileInput').addEventListener('change', function (event) {
-  const file = event.target.files[0];
-  if (!file || !peer || !peer.connected) return;
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 🛑 파일 크기 제한: 100KB 초과 시 경고
+  if (file.size > 100 * 1024) {
+    alert("전송 불가! 100KB 이하의 파일만 전송할 수 있습니다.");
+    return;
+  }
 
   const reader = new FileReader();
-  reader.onload = function (e) {
-    const fileData = {
-      type: 'file',
-      name: file.name,
-      size: file.size,
-      content: Array.from(new Uint8Array(e.target.result))
-    };
-    peer.send(JSON.stringify(fileData));
+  reader.onload = () => {
+    if (peer && peer.connected) {
+      peer.send(JSON.stringify({
+        type: 'file',
+        filename: file.name,
+        data: reader.result
+      }));
 
-    const chatBox = document.getElementById('chatBox');
-    chatBox.innerHTML += `<div class="text-right text-purple-600">📁 파일 전송됨: ${file.name} (${file.size} bytes)</div>`;
-    chatBox.scrollTop = chatBox.scrollHeight;
+      const chatBox = document.getElementById('chatBox');
+      chatBox.innerHTML += `<div class="text-right text-blue-600">📤 파일 전송: ${file.name}</div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   };
-  reader.readAsArrayBuffer(file);
-  event.target.value = ''; // 같은 파일 다시 선택 가능하게 초기화
+  reader.readAsDataURL(file); // base64 인코딩
 });
 
 
