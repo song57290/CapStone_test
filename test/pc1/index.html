@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
-<title>PC1 - 실제 조이스틱 데이터 전송 및 영상 수신</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
-<script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>PC1 - 실제 조이스틱 데이터 전송 및 영상 수신</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
+  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
 </head>
 
 <body class="bg-gray-100">
@@ -62,134 +62,134 @@
 </main>
 
 <script>
-const signalingServer = 'https://my-signaling-server-uo91.onrender.com';
-const socket = io(signalingServer, { transports: ['websocket'] });
-let peer = null;
-let isReconnecting = false;
-let isLogging = false;
-let loggedData = [];
-let isReplaying = false;
-let replayIndex = 0;
-let replayTimeout = null;
+  const signalingServer = 'https://my-signaling-server-uo91.onrender.com';
+  const socket = io(signalingServer, { transports: ['websocket'] });
+  let peer = null;
+  let isReconnecting = false;
+  let isLogging = false;
+  let loggedData = [];
+  let isReplaying = false;
+  let replayIndex = 0;
+  let replayTimeout = null;
 
-function updateStatus(text, colorClass) {
-  const statusElem = document.getElementById('status');
-  statusElem.innerText = text;
-  statusElem.classList.remove('text-yellow-600', 'text-green-600', 'text-red-600');
-  statusElem.classList.add(colorClass);
-}
+  function updateStatus(text, colorClass) {
+    const statusElem = document.getElementById('status');
+    statusElem.innerText = text;
+    statusElem.classList.remove('text-yellow-600', 'text-green-600', 'text-red-600');
+    statusElem.classList.add(colorClass);
+  }
 
-function initializePeer() {
-  if (peer && !peer.destroyed) peer.destroy();
+  function initializePeer() {
+    if (peer && !peer.destroyed) peer.destroy();
 
-  peer = new SimplePeer({
-    initiator: true,
-    trickle: false,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'turn:your.external.ip:3478', username: 'user', credential: 'pass' }
-      ]
-    }
+    peer = new SimplePeer({
+      initiator: true,
+      trickle: false,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'turn:your.external.ip:3478', username: 'user', credential: 'pass' }
+        ]
+      }
+    });
+
+    peer.on('signal', data => socket.emit('signal', data));
+    peer.on('connect', () => {
+      isReconnecting = false;
+      updateStatus('PC2와 연결됨', 'text-green-600');
+      console.log('🔄 peer connected');
+      isLogging = false;
+      document.getElementById('startLogButton').textContent = "로그 시작";
+    });
+
+    peer.on('close', () => {
+      if (isReconnecting) {
+        console.log("PC1: 재접속 중...");
+        return;
+      }
+      updateStatus('연결 끊어짐', 'text-red-600');
+    });
+
+    peer.on('track', (track, stream) => {
+      document.getElementById('remoteVideo').srcObject = stream;
+    });
+  }
+
+  socket.on('signal', data => {
+    if (peer) peer.signal(data);
   });
 
-  peer.on('signal', data => socket.emit('signal', data));
-  peer.on('connect', () => {
-    isReconnecting = false;
-    updateStatus('PC2와 연결됨', 'text-green-600');
-    console.log('🔄 peer connected');
+  document.getElementById('startLogButton').addEventListener('click', () => {
+    isLogging = true;
+    loggedData = [];
+    isReplaying = false;
+    clearTimeout(replayTimeout);
+    document.getElementById('startLogButton').textContent = "로그 측정 중...";
+    updateStatus('📝 반복 작업 측정 중...', 'text-green-600');
+    console.log('로그 시작');
+  });
+
+  document.getElementById('stopLogButton').addEventListener('click', () => {
     isLogging = false;
-    document.getElementById('startLogButton').textContent = "로그 시작";
-  });
-
-  peer.on('close', () => {
-    if (isReconnecting) {
-      console.log("PC1: 재접속 중...");
-      return;
-    }
-    updateStatus('연결 끊어짐', 'text-red-600');
-  });
-
-  peer.on('track', (track, stream) => {
-    document.getElementById('remoteVideo').srcObject = stream;
-  });
-}
-
-socket.on('signal', data => {
-  if (peer) peer.signal(data);
-});
-
-document.getElementById('startLogButton').addEventListener('click', () => {
-  isLogging = true;
-  loggedData = [];
-  isReplaying = false;
-  clearTimeout(replayTimeout);
-  document.getElementById('startLogButton').textContent = "로그 측정 중...";
-  updateStatus('📝 반복 작업 측정 중...', 'text-green-600');
-  console.log('로그 시작');
-});
-
-document.getElementById('stopLogButton').addEventListener('click', () => {
-  isLogging = false;
-  isReplaying = true;
-  replayIndex = 0;
-  clearTimeout(replayTimeout);
-  document.getElementById('startLogButton').textContent = "로그 시작";
-  updateStatus('🔁 반복 작업 중... | 조이스틱 입력 중지', 'text-green-600');
-  console.log(`로그 종료 → 무한 반복 재생 시작`);
-  startReplay();
-});
-
-document.getElementById('pauseLogButton').addEventListener('click', () => {
-  isReplaying = false;
-  clearTimeout(replayTimeout);
-  document.getElementById('startLogButton').textContent = "로그 시작";
-  updateStatus('⏸ 반복 작업 중단됨!', 'text-yellow-600');
-  console.log('⏸ 반복 중단됨');
-});
-
-document.getElementById('resetLogButton').addEventListener('click', () => {
-  isLogging = false;
-  loggedData = [];
-  isReplaying = false;
-  clearTimeout(replayTimeout);
-  document.getElementById('startLogButton').textContent = "로그 시작";
-  updateStatus('🧹 초기화 완료!', 'text-red-600');
-  console.log('🧹 로그 초기화 완료');
-});
-
-document.getElementById('resumeLogButton').addEventListener('click', () => {
-  if (loggedData.length > 0 && peer && peer.connected && !isReplaying) {
-    console.log(`▶️ 반복 재생 재시작`);
-    updateStatus('▶️ 반복 작업 중... | 조이스틱 입력 중지', 'text-green-600');
     isReplaying = true;
     replayIndex = 0;
+    clearTimeout(replayTimeout);
+    document.getElementById('startLogButton').textContent = "로그 시작";
+    updateStatus('🔁 반복 작업 중... | 조이스틱 입력 중지', 'text-green-600');
+    console.log(`로그 종료 → 무한 반복 재생 시작`);
     startReplay();
-  } else {
-    console.log('⚠️ 재생할 로그가 없거나 이미 재생 중입니다.');
-    updateStatus('🚫 재생할 로그가 없습니다.', 'text-red-600');
-  }
-});
+  });
 
-function startReplay() {
-  if (!peer || !peer.connected || !isReplaying) return;
+  document.getElementById('pauseLogButton').addEventListener('click', () => {
+    isReplaying = false;
+    clearTimeout(replayTimeout);
+    document.getElementById('startLogButton').textContent = "로그 시작";
+    updateStatus('⏸ 반복 작업 중단됨!', 'text-yellow-600');
+    console.log('⏸ 반복 중단됨');
+  });
 
-  const currentData = loggedData[replayIndex];
-  peer.send(JSON.stringify({
-    axes: currentData.axes,
-    buttons: currentData.buttons
-  }));
+  document.getElementById('resetLogButton').addEventListener('click', () => {
+    isLogging = false;
+    loggedData = [];
+    isReplaying = false;
+    clearTimeout(replayTimeout);
+    document.getElementById('startLogButton').textContent = "로그 시작";
+    updateStatus('🧹 초기화 완료!', 'text-red-600');
+    console.log('🧹 로그 초기화 완료');
+  });
 
-  const x = currentData.axes[0];
-  const y = currentData.axes[1];
-  const z = currentData.axes[3] || 0;
-  const A = currentData.buttons[4] || 0;
-  const B = currentData.buttons[5] || 0;
-  console.log(`▶️ 반복 전송 중: X=${x}, Y=${y}, Z=${z}, LB=${A}, RB=${B}`);
+  document.getElementById('resumeLogButton').addEventListener('click', () => {
+    if (loggedData.length > 0 && peer && peer.connected && !isReplaying) {
+      console.log(`▶️ 반복 재생 재시작`);
+      updateStatus('▶️ 반복 작업 중... | 조이스틱 입력 중지', 'text-green-600');
+      isReplaying = true;
+      replayIndex = 0;
+      startReplay();
+    } else {
+      console.log('⚠️ 재생할 로그가 없거나 이미 재생 중입니다.');
+      updateStatus('🚫 재생할 로그가 없습니다.', 'text-red-600');
+    }
+  });
 
-  // 🟢 추가 : 화면에도 반복중인 값 표시하기
-  document.getElementById('outgoingData').innerHTML = `
-    <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
+  function startReplay() {
+    if (!peer || !peer.connected || !isReplaying) return;
+
+    const currentData = loggedData[replayIndex];
+    peer.send(JSON.stringify({
+      axes: currentData.axes,
+      buttons: currentData.buttons
+    }));
+
+    const x = currentData.axes[0];
+    const y = currentData.axes[1];
+    const z = currentData.axes[3] || 0;
+    const A = currentData.buttons[4] || 0;
+    const B = currentData.buttons[5] || 0;
+    console.log(`▶️ 반복 전송 중: X=${x}, Y=${y}, Z=${z}, LB=${A}, RB=${B}`);
+
+    // 🟢 추가 : 화면에도 반복중인 값 표시하기
+    document.getElementById('outgoingData').innerHTML = `
+      <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
       |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${x}</span></div>|
       <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-y}</span></div>|
       <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-z}</span></div>|
@@ -197,87 +197,103 @@ function startReplay() {
       <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${B}</span></div>|
     </div>`;
 
-  const currentTimestamp = currentData.timestamp;
-  replayIndex++;
-  if (replayIndex >= loggedData.length) replayIndex = 0;
-  const nextTimestamp = loggedData[replayIndex].timestamp;
-  let delay = nextTimestamp - currentTimestamp;
-  delay = Math.max(16, delay);
+    const currentTimestamp = currentData.timestamp;
+    replayIndex++;
+    if (replayIndex >= loggedData.length) replayIndex = 0;
+    const nextTimestamp = loggedData[replayIndex].timestamp;
+    let delay = nextTimestamp - currentTimestamp;
+    delay = Math.max(16, delay);
 
-  replayTimeout = setTimeout(startReplay, delay);
-}
+    replayTimeout = setTimeout(startReplay, delay);
+  }
 
 
-function updateGamepad() {
-  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-  if (gamepads[0]) {
-    const gp = gamepads[0];
-    const data = {
+  function updateGamepad() {
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    if (gamepads[0]) {
+      const gp = gamepads[0];
+      const data = {
       axes: gp.axes.map(v => +v.toFixed(2)),
       buttons: gp.buttons.map(b => b.pressed ? 1 : 0),
       timestamp: Date.now()
-    };
+      };
 
-    if (!isReplaying) {
-    document.getElementById('outgoingData').innerHTML = `
-      <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
+      if (!isReplaying) {
+      document.getElementById('outgoingData').innerHTML = `
+        <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
         |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${data.axes[0]}</span></div>|
         <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-data.axes[1]}</span></div>|
         <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-data.axes[3] || 0}</span></div>|
         <div class="flex items-center gap-1">LB: <span class="text-black w-10 text-center">${data.buttons[4]}</span></div>|
         <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${data.buttons[5]}</span></div>|
-      </div>`;
-    }
+        </div>`;
+      }
 
-    if (peer && peer.connected && !isReplaying) {
-      peer.send(JSON.stringify(data));
+      if (peer && peer.connected && !isReplaying) {
+        peer.send(JSON.stringify(data));
 
-      const x = data.axes[0];
-      const y = data.axes[1];
-      const z = data.axes[3] || 0;
-      const A = data.buttons[4] || 0;
-      const B = data.buttons[5] || 0;
-      console.log(`📤 X: ${x}, Y: ${y}, Z: ${z}, LB: ${A}, RB: ${B}`);
-    }
+        const x = data.axes[0];
+        const y = data.axes[1];
+        const z = data.axes[3] || 0;
+        const A = data.buttons[4] || 0;
+        const B = data.buttons[5] || 0;
+        console.log(`📤 X: ${x}, Y: ${y}, Z: ${z}, LB: ${A}, RB: ${B}`);
+      }
 
-    if (isLogging && loggedData.length < 300) {
-      loggedData.push(data);
+      if (isLogging && loggedData.length < 300) {
+        loggedData.push(data);
+      }
     }
+    requestAnimationFrame(updateGamepad);
   }
-  requestAnimationFrame(updateGamepad);
-}
 
-window.addEventListener("gamepadconnected", (e) => {
-  console.log("🎮 조이스틱 연결됨:", e.gamepad);
-  updateGamepad();
-});
+  window.addEventListener("gamepadconnected", (e) => {
+    console.log("🎮 조이스틱 연결됨:", e.gamepad);
+    updateGamepad();
+  });
 
-document.getElementById('disconnectButton').addEventListener('click', () => {
-  socket.emit('disconnectSignal', { from: 'PC1' });
-  if (peer && !peer.destroyed) peer.destroy();
-  updateStatus('연결 끊어짐', 'text-red-600');
-});
+  document.getElementById('disconnectButton').addEventListener('click', () => {
+    socket.emit('disconnectSignal', { from: 'PC1' });
+    if (peer && !peer.destroyed) peer.destroy();
+    updateStatus('연결 끊어짐', 'text-red-600');
+  });
 
-document.getElementById('reconnectButton').addEventListener('click', () => {
-  isReconnecting = true;
-  updateStatus('연결 대기중...', 'text-yellow-600');
-  clearTimeout(replayTimeout);
-  loggedData = [];
-  isReplaying = false;
-  document.getElementById('startLogButton').textContent = "로그 시작";
+  document.getElementById('reconnectButton').addEventListener('click', () => {
+    isReconnecting = true;
+    updateStatus('연결 대기중...', 'text-yellow-600');
+    clearTimeout(replayTimeout);
+    loggedData = [];
+    isReplaying = false;
+    document.getElementById('startLogButton').textContent = "로그 시작";
+    initializePeer();
+    socket.emit('reconnectRequest', { from: 'PC1' });
+  });
+
+  document.getElementById('updateSize').addEventListener('click', () => {
+    const w = document.getElementById('videoWidth').value;
+    const h = document.getElementById('videoHeight').value;
+    const v = document.getElementById('remoteVideo');
+    v.style.width = w + 'px';
+    v.style.height = h + 'px';
+  });
+
   initializePeer();
-  socket.emit('reconnectRequest', { from: 'PC1' });
-});
 
-document.getElementById('updateSize').addEventListener('click', () => {
-  const w = document.getElementById('videoWidth').value;
-  const h = document.getElementById('videoHeight').value;
-  const v = document.getElementById('remoteVideo');
-  v.style.width = w + 'px';
-  v.style.height = h + 'px';
-});
+  document.getElementById('sendButton').addEventListener('click', () => {
+    const input = document.getElementById('messageInput');
+    const msg = input.value.trim();
+    if (!msg) return;
 
-initializePeer();
-</script>
-</body>
+    if (peer && peer.connected) {
+      peer.send(JSON.stringify({ type: 'chat', message: msg }));
+      const chatBox = document.getElementById('chatBox');
+      chatBox.innerHTML += `<div class="text-right text-blue-600">📤 나: ${msg}</div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      input.value = '';
+    } else {
+      alert("❌ 연결되지 않았습니다.");
+    }
+  });
+  </script>
+  </body>
 </html>

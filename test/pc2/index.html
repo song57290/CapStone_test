@@ -1,35 +1,36 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
-<title>PC2 - 조이스틱 데이터 수신 및 화면 송출</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
-<script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/RobotWebTools/roslibjs/build/roslib.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>PC2 - 조이스틱 데이터 수신 및 화면 송출</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.0/simplepeer.min.js"></script>
+  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/RobotWebTools/roslibjs/build/roslib.min.js"></script>
 </head>
 
 <body class="bg-gray-100">
-<header class="flex items-center justify-between p-4 bg-blue-800 text-white">
-  <div class="flex items-center gap-4">
-    <img src="https://blog.kakaocdn.net/dn/71hSN/btsJTBBLxY4/JjQxPDPxp1BZhDPm9u0bEK/img.gif" alt="로고 이미지" class="h-14 w-auto rounded-full">
-    <h1 class="text-xl font-bold whitespace-nowrap">PC2: 조이스틱 데이터 수신 및 화면 송출</h1>
-  </div>
-  <div class="flex gap-2">
-    <button id="reconnectButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">재연결</button>
-    <button id="disconnectButton" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">연결 종료</button>
-  </div>
-</header>
+  <header class="flex items-center justify-between p-4 bg-blue-800 text-white">
+    <div class="flex items-center gap-4">
+      <img src="https://blog.kakaocdn.net/dn/71hSN/btsJTBBLxY4/JjQxPDPxp1BZhDPm9u0bEK/img.gif" alt="로고 이미지" class="h-14 w-auto rounded-full">
+      <h1 class="text-xl font-bold whitespace-nowrap">PC2: 조이스틱 데이터 수신 및 화면 송출</h1>
+    </div>
+    <div class="flex gap-2">
+      <button id="reconnectButton" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">재연결</button>
+      <button id="disconnectButton" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">연결 종료</button>
+    </div>
+  </header>
 
-<main class="flex flex-col gap-4 p-4">
-  <section class="flex flex-col gap-2 rounded bg-white p-4 shadow">
-    <div id="status" class="text-lg font-semibold text-yellow-600">연결 대기중...</div>
-    <div id="joystickData" class="text-gray-700 text-center">수신 데이터 없음</div>
-  </section>
+  <main class="flex p-4 gap-4">
+    <!-- 왼쪽: 비디오 및 조이스틱 데이터 -->
+    <div class="flex-1 flex flex-col gap-4">
+      <section class="rounded bg-white p-4 shadow text-center">
+        <div id="status" class="text-lg font-semibold text-yellow-600">연결 대기중...</div>
+        <div id="joystickData" class="text-gray-700 text-center mt-2">수신 데이터 없음</div>
+      </section>
 
-  <div class="flex gap-4">
-    <section class="flex-1 flex flex-col gap-4">
       <video id="localVideo" autoplay playsinline muted class="h-auto w-full rounded bg-black shadow"></video>
+
       <div class="flex flex-wrap items-center gap-2 rounded bg-white p-2 shadow">
         <label for="videoWidth" class="text-sm">Width:</label>
         <input type="number" id="videoWidth" value="1920" class="w-24 rounded border p-1 text-sm" />
@@ -37,171 +38,177 @@
         <input type="number" id="videoHeight" value="1080" class="w-24 rounded border p-1 text-sm" />
         <button id="updateSize" class="rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700">사이즈 적용</button>
       </div>
-    </section>
+    </div>
 
+    <!-- 오른쪽: 채팅/파일 -->
     <section class="w-1/4 flex flex-col gap-2 bg-white p-4 shadow rounded">
       <h2 class="text-lg font-semibold">대화창 / 파일 수신</h2>
-      <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2 mb-2"></div>
+      <div id="chatBox" class="flex-1 h-80 overflow-y-scroll bg-gray-50 p-2 mb-2 border"></div>
     </section>
-  </div>
-</main>
+  </main>
 
-<script>
-const signalingServer = 'https://my-signaling-server-uo91.onrender.com';
-const socket = io(signalingServer, { transports: ['websocket'] });
-let peer = null;
-let localStream = null;
-const statusElem = document.getElementById('status');
+  <script>
+    const signalingServer = 'https://my-signaling-server-uo91.onrender.com';
+    const socket = io(signalingServer, { transports: ['websocket'] });
+    let peer = null;
+    let localStream = null;
+    const statusElem = document.getElementById('status');
 
-const ros = new ROSLIB.Ros({ url: 'ws://192.168.35.245:9090' });
-ros.on('connection', () => console.log('ROS 2 연결됨'));
-ros.on('error', error => console.error('ROS 2 오류:', error));
-ros.on('close', () => console.log('ROS 2 연결 종료'));
-
-const joystickPub = new ROSLIB.Topic({
-  ros: ros,
-  name: '/joystick_data',
-  messageType: 'sensor_msgs/Joy'
-});
-
-function updateStatus(text, colorClass) {
-  statusElem.innerText = text;
-  statusElem.classList.remove('text-yellow-600', 'text-green-600', 'text-red-600');
-  statusElem.classList.add(colorClass);
-}
-
-function cleanupStream() {
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  document.getElementById('localVideo').srcObject = null;
-}
-
-function initializePeer() {
-  if (peer && !peer.destroyed) peer.destroy();
-
-  peer = new SimplePeer({
-    initiator: false,
-    trickle: false,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'turn:your.external.ip:3478', username: 'user', credential: 'pass' }
-      ]
-    }
-  });
-
-  peer.on('signal', data => socket.emit('signal', data));
-
-  peer.on('connect', () => {
-    updateStatus('PC1과 연결됨', 'text-green-600');
-    startScreenShare();
-  });
-
-  peer.on('close', () => {
-    updateStatus('연결 끊어짐', 'text-red-600');
-    cleanupStream();
-    setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
-  });
-
-  peer.on('error', err => console.error("Peer error:", err));
-
-  peer.on('data', (data) => {
-    try {
-      const text = new TextDecoder().decode(data);
-      const parsed = JSON.parse(text);
-
-      if (parsed.axes && parsed.buttons) {
-        const x = parsed.axes[0];
-        const y = parsed.axes[1];
-        const z = parsed.axes[3] || 0;
-        const A = parsed.buttons[4] || 0;
-        const B = parsed.buttons[5] || 0;
-
-        console.log(`\u{1F4E5} X: ${x}, Y: ${y}, Z: ${z}, LB: ${A}, RB: ${B}`);
-
-        document.getElementById('joystickData').innerHTML = `
-          <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
-            |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${x}</span></div>|
-            <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-y}</span></div>|
-            <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-z}</span></div>|
-            <div class="flex items-center gap-1">LB: <span class="text-black w-10 text-center">${A}</span></div>|
-            <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${B}</span></div>|
-          </div>`;
-
-        const joyMsg = new ROSLIB.Message({ axes: parsed.axes, buttons: parsed.buttons });
-        joystickPub.publish(joyMsg);
-      } else {
-        console.warn("알 수 없는 데이터:", parsed);
-      }
-    } catch (e) {
-      console.error("데이터 처리 오류:", e);
-    }
-  });
-}
-
-socket.on('signal', data => {
-  if (!peer || peer.destroyed) initializePeer();
-  peer.signal(data);
-});
-
-socket.on('disconnectSignal', () => {
-  if (peer && !peer.destroyed) peer.destroy();
-  updateStatus('연결 끊어짐', 'text-red-600');
-  cleanupStream();
-  setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
-});
-
-// ✅ 채팅 메시지 수신 처리
-socket.on('chat', ({ from, message }) => {
-  const chatBox = document.getElementById('chatBox');
-  const newMsg = document.createElement('div');
-  newMsg.textContent = `[${from}] ${message}`;
-  chatBox.appendChild(newMsg);
-  chatBox.scrollTop = chatBox.scrollHeight;
-});
-
-document.getElementById('disconnectButton').addEventListener('click', () => {
-  if (peer && !peer.destroyed) peer.destroy();
-  socket.emit('disconnectSignal', { from: 'PC2' });
-});
-
-document.getElementById('reconnectButton').addEventListener('click', () => {
-  if (peer && !peer.destroyed) {
-    peer.removeAllListeners();
-    peer.destroy();
-  }
-  updateStatus('연결 대기중...', 'text-yellow-600');
-  initializePeer();
-  socket.emit('reconnectRequest', { from: 'PC2' });
-});
-
-document.getElementById('updateSize').addEventListener('click', () => {
-  const w = document.getElementById('videoWidth').value;
-  const h = document.getElementById('videoHeight').value;
-  const v = document.getElementById('localVideo');
-  v.style.width = w + 'px';
-  v.style.height = h + 'px';
-});
-
-function startScreenShare() {
-  navigator.mediaDevices.getDisplayMedia({
-    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-    audio: false
-  })
-  .then(stream => {
-    cleanupStream();
-    localStream = stream;
-    document.getElementById('localVideo').srcObject = stream;
-    stream.getTracks().forEach(track => {
-      try { peer.addTrack(track, stream); } catch (err) { console.error("트랙 추가 오류:", err); }
+    const ros = new ROSLIB.Ros({
+      url: 'ws://192.168.35.245:9090'
     });
-  })
-  .catch(err => console.error("화면 공유 오류:", err));
-}
+    ros.on('connection', () => console.log('ROS 2 연결됨'));
+    ros.on('error', error => console.error('ROS 2 오류:', error));
+    ros.on('close', () => console.log('ROS 2 연결 종료'));
 
-initializePeer();
-</script>
+    const joystickPub = new ROSLIB.Topic({
+      ros: ros,
+      name: '/joystick_data',
+      messageType: 'sensor_msgs/Joy'
+    });
+
+    function updateStatus(text, colorClass) {
+      statusElem.innerText = text;
+      statusElem.classList.remove('text-yellow-600', 'text-green-600', 'text-red-600');
+      statusElem.classList.add(colorClass);
+    }
+
+    function cleanupStream() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      document.getElementById('localVideo').srcObject = null;
+    }
+
+    function initializePeer() {
+      if (peer && !peer.destroyed) peer.destroy();
+
+      peer = new SimplePeer({
+        initiator: false,
+        trickle: false,
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'turn:your.external.ip:3478', username: 'user', credential: 'pass' }
+          ]
+        }
+      });
+
+      peer.on('signal', data => socket.emit('signal', data));
+
+      peer.on('connect', () => {
+        updateStatus('PC1과 연결됨', 'text-green-600');
+        startScreenShare();
+      });
+
+      peer.on('close', () => {
+        updateStatus('연결 끊어짐', 'text-red-600');
+        cleanupStream();
+        setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
+      });
+
+      peer.on('error', err => console.error("Peer error:", err));
+
+      peer.on('data', (data) => {
+        try {
+          const text = new TextDecoder().decode(data);
+          const parsed = JSON.parse(text);
+
+          if (parsed.axes && parsed.buttons) {
+            const x = parsed.axes[0];
+            const y = parsed.axes[1];
+            const z = parsed.axes[3] || 0;
+            const A = parsed.buttons[4] || 0;
+            const B = parsed.buttons[5] || 0;
+
+            console.log(`📥 X: ${x}, Y: ${y}, Z: ${z}, LB: ${A}, RB: ${B}`);
+
+            document.getElementById('joystickData').innerHTML = `
+              <div class="flex flex-wrap justify-center gap-4 text-lg font-bold">
+                |<div class="flex items-center gap-1">X축: <span class="text-black w-10 text-center">${x}</span></div>|
+                <div class="flex items-center gap-1">Y축: <span class="text-black w-10 text-center">${-y}</span></div>|
+                <div class="flex items-center gap-1">Z축: <span class="text-black w-10 text-center">${-z}</span></div>|
+                <div class="flex items-center gap-1">LB: <span class="text-black w-10 text-center">${A}</span></div>|
+                <div class="flex items-center gap-1">RB: <span class="text-black w-10 text-center">${B}</span></div>|
+              </div>`;
+
+            const joyMsg = new ROSLIB.Message({ axes: parsed.axes, buttons: parsed.buttons });
+            joystickPub.publish(joyMsg);
+          } else if (parsed.type === "chat" && parsed.message) {
+            const chatBox = document.getElementById('chatBox');
+            const msgElem = document.createElement('div');
+            msgElem.textContent = `📨 ${parsed.message}`;
+            chatBox.appendChild(msgElem);
+            chatBox.scrollTop = chatBox.scrollHeight;
+          } else if (parsed.type === "file" && parsed.filename && parsed.data) {
+            const chatBox = document.getElementById('chatBox');
+            const a = document.createElement('a');
+            a.href = parsed.data;
+            a.download = parsed.filename;
+            a.textContent = `📁 ${parsed.filename} 다운로드`;
+            a.classList.add("block", "text-blue-600", "hover:underline", "mb-2");
+            chatBox.appendChild(a);
+            chatBox.scrollTop = chatBox.scrollHeight;
+          }
+        } catch (e) {
+          console.error("데이터 처리 오류:", e);
+        }
+      });
+    }
+
+    socket.on('signal', data => {
+      if (!peer || peer.destroyed) initializePeer();
+      peer.signal(data);
+    });
+
+    socket.on('disconnectSignal', () => {
+      if (peer && !peer.destroyed) peer.destroy();
+      updateStatus('연결 끊어짐', 'text-red-600');
+      cleanupStream();
+      setTimeout(() => updateStatus('연결 대기중...', 'text-yellow-600'), 3000);
+    });
+
+    document.getElementById('disconnectButton').addEventListener('click', () => {
+      if (peer && !peer.destroyed) peer.destroy();
+      socket.emit('disconnectSignal', { from: 'PC2' });
+    });
+
+    document.getElementById('reconnectButton').addEventListener('click', () => {
+      if (peer && !peer.destroyed) {
+        peer.removeAllListeners();
+        peer.destroy();
+      }
+      updateStatus('연결 대기중...', 'text-yellow-600');
+      initializePeer();
+      socket.emit('reconnectRequest', { from: 'PC2' });
+    });
+
+    document.getElementById('updateSize').addEventListener('click', () => {
+      const w = document.getElementById('videoWidth').value;
+      const h = document.getElementById('videoHeight').value;
+      const v = document.getElementById('localVideo');
+      v.style.width = w + 'px';
+      v.style.height = h + 'px';
+    });
+
+    function startScreenShare() {
+      navigator.mediaDevices.getDisplayMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      })
+      .then(stream => {
+        cleanupStream();
+        localStream = stream;
+        document.getElementById('localVideo').srcObject = stream;
+        stream.getTracks().forEach(track => {
+          try { peer.addTrack(track, stream); } catch (err) { console.error("트랙 추가 오류:", err); }
+        });
+      })
+      .catch(err => console.error("화면 공유 오류:", err));
+    }
+
+    initializePeer();
+  </script>
 </body>
 </html>
