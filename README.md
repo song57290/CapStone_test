@@ -60,3 +60,6 @@ test18
 
 test19
 - PC2측 글씨 오류 수정
+
+test19 recovery
+- 이전에 수정했던 내용 날리기
