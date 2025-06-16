@@ -69,3 +69,6 @@ test20
 
 test21
 - test_joint_state_pub.py 추가
+
+test22
+- PC간 반복전송 방법 수정
