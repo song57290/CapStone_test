@@ -66,3 +66,6 @@ test19 recovery
 
 test20
 - 절대 아무것도 건들지 말것
+
+test21
+- test_joint_state_pub.py 추가
